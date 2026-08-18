@@ -1,0 +1,47 @@
+services:
+  qwen38:
+    image: vllm-node-b12x:latest
+    container_name: qwen38-vllm
+    entrypoint: ["vllm"]
+    command:
+      - serve
+      - unsloth/Qwen3.8-27B-NVFP4
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8000"
+      - --tensor-parallel-size
+      - "1"
+      - --gpu-memory-utilization
+      - "0.45"
+      - --max-model-len
+      - "262144"
+      - --max-num-seqs
+      - "4"
+      - --max-num-batched-tokens
+      - "8192"
+      - --trust-remote-code
+      - --reasoning-parser
+      - qwen3
+      - --tool-call-parser
+      - qwen3_xml
+      - --enable-auto-tool-choice
+      - --distributed-executor-backend
+      - mp
+      - --speculative-config
+      - '{"method":"mtp","num_speculative_tokens":5}'
+    environment:
+      - HF_HOME=/root/.cache/huggingface
+    volumes:
+      - ~/.cache/huggingface:/root/.cache/huggingface
+    ports:
+      - "8000:8000"
+    shm_size: "2g"
+    restart: unless-stopped
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]

@@ -1,0 +1,44 @@
+services:
+  qwen38:
+    image: lmsysorg/sglang:qwen38-27b
+    container_name: qwen38-sglang
+    entrypoint: ["sglang"]
+    command:
+      - serve
+      - --trust-remote-code
+      - --model-path
+      - RadixArk/Qwen3.8-27B-NVFP4
+      - --mem-fraction-static
+      - "0.7"
+      - --max-total-tokens
+      - "131072"
+      - --attention-backend
+      - flashinfer
+      - --chunked-prefill-size
+      - "8192"
+      - --disable-prefill-cuda-graph
+      - --reasoning-parser
+      - qwen3
+      - --tool-call-parser
+      - qwen3_coder
+      - --allow-auto-truncate
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8000"
+    environment:
+      - HF_HOME=/root/.cache/huggingface
+    volumes:
+      - ~/.cache/huggingface:/root/.cache/huggingface
+    ports:
+      - "8000:8000"
+    ipc: host
+    shm_size: "32g"
+    restart: unless-stopped
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]

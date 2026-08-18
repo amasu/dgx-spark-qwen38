@@ -1,0 +1,46 @@
+services:
+  qwen38:
+    image: vllm-openai:deepgemm
+    container_name: qwen38
+    command:
+      - --model
+      - Qwen/Qwen3.8-27B-FP8
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8000"
+      - --served-model-name
+      - qwen3.8-27b
+      - --gpu-memory-utilization
+      - "0.85"
+      - --max-model-len
+      - "32768"
+      - --dtype
+      - auto
+      - --trust-remote-code
+      - --enable-prefix-caching
+      - --reasoning-parser
+      - qwen3
+      - --spec-method
+      - dspark
+      - --spec-model
+      - Doopeworld/Qwen3.8-27B-DSpark-vLLM
+      - --spec-tokens
+      - "7"
+    environment:
+      - HF_HOME=/root/.cache/huggingface
+      - VLLM_USE_DEEP_GEMM=1
+    volumes:
+      - ~/.cache/huggingface:/root/.cache/huggingface
+    ports:
+      - "8000:8000"
+    ipc: host
+    shm_size: "4g"
+    restart: unless-stopped
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
