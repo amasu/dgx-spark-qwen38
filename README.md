@@ -3,6 +3,45 @@
 Compose configs for serving **Qwen3.8-27B** on an NVIDIA DGX Spark (GB10) unit.
 Developed and validated on `aitopatom1` (host alias via NVIDIA Sync ssh_config, user `amasu`).
 
+## Quick start
+
+Deploy the current production stack (vLLM + NVFP4 + MTP) on a fresh DGX Spark:
+
+```bash
+# Prerequisites: DGX Spark with Docker + Compose plugin (preinstalled),
+# git, and ~24 GB free disk for the weights on first run.
+
+git clone https://github.com/amasu/dgx-spark-qwen38
+cd dgx-spark-qwen38
+
+# 1. Start the current production stack (vLLM + NVFP4 + MTP)
+docker compose -f docker-compose.vllm.yml up -d
+
+# 2. Wait for boot (3–4 min with cached weights; longer on first run), then poll:
+watch -n 10 'curl -s -o /dev/null -w "%{http_code}\n" http://localhost:8000/health'
+#    → 200 means ready. Do NOT send requests before this; first request includes
+#      JIT warmup and will be slow anyway.
+
+# 3. Smoke test (served model name = model arg)
+curl http://localhost:8000/v1/chat/completions -H "Content-Type: application/json" -d '{
+  "model": "unsloth/Qwen3.8-27B-NVFP4",
+  "messages": [{"role": "user", "content": "Explain what a DGX Spark is in two sentences."}],
+  "max_tokens": 256
+}'
+
+# 4. Verify MTP speculative decoding is active
+docker compose -f docker-compose.vllm.yml logs | grep "Resolved architecture"
+#    → expect: Resolved architecture: Qwen3_5MTP (fallback: Qwen3_5Text = no MTP)
+
+# Switch to the SGLang rollback stack if needed:
+docker compose -f docker-compose.vllm.yml down
+docker compose -f docker-compose.sglang.yml up -d
+```
+
+**Troubleshooting:** if the container crash-loops, check fresh `docker ps`
+start times and `docker logs <container>` for the root traceback before
+changing config. `restart: unless-stopped` hides engine crashes behind restarts.
+
 ## Files
 
 | File | Stack | Status |
@@ -54,9 +93,37 @@ docker ps   # check for crash-loop (restart: unless-stopped + engine crash = sil
 
 Per-request thinking toggle: `chat_template_kwargs: {"enable_thinking": false}`.
 
+## Credits
+
+This repo's configs are based on community work in the NVIDIA DGX Spark /
+GB10 User Forum. Special thanks to:
+
+- **helge** — author of the vLLM+MTP measurement thread
+  ([#380244](https://forums.developer.nvidia.com/t/qwen3-8-27b-nvfp4-on-a-single-dgx-spark-up-to-1m-context-vllm-mtp-measurements/380244))
+  and the dual-Spark thread
+  ([#380350](https://forums.developer.nvidia.com/t/qwen3-8-27b-on-dual-sparks/380350)).
+  His MTP-on-NVFP4 recipe is the basis of our current production compose.
+- **basbunarhasan** — author of the open-source one-command SGLang + NVFP4 +
+  DSpark setup thread
+  ([#380257](https://forums.developer.nvidia.com/t/qwen3-8-27b-at-34-38-tok-s-on-dgx-spark-open-source-one-command-setup-sglang-nvfp4-dspark/380257)),
+  basis of the SGLang rollback stack.
+- Thread participants who validated, benchmarked and debugged alongside them:
+  **jomark, jwarner, seddonm1, tim318, voktolom, 1ou2, elsaco, vasimv,
+  styles01, datltq, jbourny, mecworks_nvidia** (#380244); **emX0r, pontostroy,
+  helge, phrogzy, clawDRude, jetspark** (#380257); **giles8, michaelhireitem,
+  0rand, shawndo** (#380350).
+- **RadixArk** — NVFP4 and DSpark draft model builds used by the SGLang stack
+  (`RadixArk/Qwen3.8-27B-NVFP4`, `RadixArk/Qwen3.8-27B-DSpark`), and the
+  target model for the one-command setup.
+- **unsloth** — NVFP4 quantization of Qwen3.8-27B; the MTP head ships inside
+  the checkpoint (`model_mtp.safetensors`), so no separate draft model is
+  needed.
+- **lmsysorg** — SGLang container image; **NVIDIA NGC** — the
+  `vllm-node-b12x` image.
+
 ## Sources
 
 NVIDIA Developer forums — DGX Spark / GB10 category:
-- Qwen3.8-27B-NVFP4 on a single DGX Spark (vLLM+MTP): thread #380244
-- Dual-Spark TP2 measurements: thread #380350
-- SGLang 34–38 tok/s thread: #380257
+- Qwen3.8-27B-NVFP4 on a single DGX Spark (vLLM+MTP): thread [#380244](https://forums.developer.nvidia.com/t/qwen3-8-27b-nvfp4-on-a-single-dgx-spark-up-to-1m-context-vllm-mtp-measurements/380244)
+- Dual-Spark TP2 measurements: thread [#380350](https://forums.developer.nvidia.com/t/qwen3-8-27b-on-dual-sparks/380350)
+- SGLang 34–38 tok/s setup: thread [#380257](https://forums.developer.nvidia.com/t/qwen3-8-27b-at-34-38-tok-s-on-dgx-spark-open-source-one-command-setup-sglang-nvfp4-dspark/380257)
