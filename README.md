@@ -92,6 +92,39 @@ Notes:
   instead shows the "auto-disables DeepGemm" note, `VLLM_USE_DEEP_GEMM=1`
   (already set in the compose file) isn't reaching the patched check.
 
+### Alternative: build the B12X serving image from source
+
+The prod stack's `vllm-node-b12x:latest` (see quick start step 0) can be
+**compiled locally** instead of using eugr's prebuilt Docker Hub image —
+useful if you want provenance control over the code, to pin a specific
+fork commit, or to layer your own vLLM PRs. Uses eugr's build script:
+
+```bash
+git clone https://github.com/eugr/spark-vllm-docker.git
+cd spark-vllm-docker
+
+# Source build of the maintained B12X combination:
+#   local-inference-lab/vllm @ dev/infernal-invocation (Luke Alonso fork)
+#   + lukealonso/b12x @ master (freshly cloned, built and installed per run)
+./build-and-copy.sh --exp-b12x --rebuild-vllm
+```
+
+- Defaults the local tag to `vllm-node-b12x` — exactly what our compose
+  expects, so no retag needed. Override with `-t <tag>`.
+- `--exp-b12x` alone just pulls the prebuilt image (equivalent to README
+  step 0); `--rebuild-vllm` is what compiles from source. Incompatible with
+  `--use-wheels` (B12X has no published wheels — it's fork/branch-specific).
+- Source rebuild takes ~20–40 min (PyTorch 2.13.0 + the vLLM fork +
+  FlashInfer wheels); later rebuilds are faster. B12X kernels stay
+  JIT-compiled at runtime, so the image build has no extra CUDA phase.
+- The exact commits baked in are recorded at `/workspace/b12x-source-commit`
+  in the image — handy for provenance audits.
+- Optional: `--apply-vllm-pr <n>` layers upstream vLLM PRs (forces a source
+  build; PRs apply to upstream vLLM, not the fork). Pin any ref with
+  `--vllm-ref <branch|tag|commit>`.
+- Result runs identically:
+  `docker compose -f docker-compose.vllm.yml up -d`.
+
 ## Current production stack
 
 `vLLM + NVFP4 + embedded MTP`, no draft model download (the MTP head ships
