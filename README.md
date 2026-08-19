@@ -14,6 +14,12 @@ Deploy the current production stack (vLLM + NVFP4 + MTP) on a fresh DGX Spark:
 git clone https://github.com/amasu/dgx-spark-qwen38
 cd dgx-spark-qwen38
 
+# 0. One-time image pull (community build, NOT from NGC — see Credits below).
+#    The prod stack's `vllm-node-b12x:latest` is a local tag of
+#    eugr/spark-vllm-b12x:latest on Docker Hub; pull + tag once per host:
+docker pull eugr/spark-vllm-b12x:latest
+docker tag eugr/spark-vllm-b12x:latest vllm-node-b12x:latest
+
 # Optional: host-specific settings (ports, model, cache path, memory — see example.env)
 cp example.env .env
 
@@ -49,7 +55,7 @@ changing config. `restart: unless-stopped` hides engine crashes behind restarts.
 
 | File | Stack | Status |
 |------|-------|--------|
-| `docker-compose.vllm.yml` | vLLM + NVFP4 + embedded MTP (`vllm-node-b12x:latest`) | **current production** |
+| `docker-compose.vllm.yml` | vLLM + NVFP4 + embedded MTP (`eugr/spark-vllm-b12x`, locally tagged `vllm-node-b12x:latest`) | **current production** |
 | `docker-compose.sglang.yml` | SGLang + NVFP4 + DSPARK draft (`lmsysorg/sglang:qwen38-27b`) | rollback |
 | `docker-compose.yml` | vLLM + FP8 + DSPARK draft (`vllm/vllm-openai:v0.27.1`) | legacy |
 | `Dockerfile` | Multi-stage DeepGemm build experiment (arm64) | experimental — see [Building the image](#building-the-experimental-image) |
@@ -98,9 +104,10 @@ inside the NVFP4 checkpoint as `model_mtp.safetensors`):
 
 Boot ~3–4 min when weights are cached; 23.4 GB weights download on first run.
 
-## NGC entrypoint trap
+## Entrypoint trap
 
-`vllm-node-*` images run `/opt/nvidia/nvidia_entrypoint.sh`, which routes the
+`vllm-node-*` images (such as eugr's, named after the NGC convention) run
+`/opt/nvidia/nvidia_entrypoint.sh`, which routes the
 literal `serve` command to Ray Serve's CLI. The compose overrides
 `entrypoint: ["vllm"]`, then `command: serve ...`. Confirm MTP active via log
 line `Resolved architecture: Qwen3_5MTP`.
@@ -170,8 +177,15 @@ GB10 User Forum. Special thanks to:
 - **unsloth** — NVFP4 quantization of Qwen3.8-27B; the MTP head ships inside
   the checkpoint (`model_mtp.safetensors`), so no separate draft model is
   needed.
+- **eugr** — maintainer of [spark-vllm-docker](https://github.com/eugr/spark-vllm-docker);
+  the prod stack's image is his CI-built Docker Hub image
+  `eugr/spark-vllm-b12x:latest`, locally tagged `vllm-node-b12x:latest`.
+  The B12X variant ships experimental kernels from
+  `local-inference-lab/vllm@dev/infernal-invocation` (Luke Alonso's fork).
+  The base Ubuntu layer is built by NVIDIA (hence the `maintainer` label),
+  but the vLLM inside is a community build, **not** an NGC image.
 - **lmsysorg** — SGLang container image; **NVIDIA NGC** — the
-  `vllm-node-b12x` image.
+  `vllm-node-*` naming convention the community adopted for these images.
 
 ## Sources
 
