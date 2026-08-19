@@ -5,21 +5,21 @@ services:
     entrypoint: ["vllm"]
     command:
       - serve
-      - unsloth/Qwen3.8-27B-NVFP4
+      - ${MODEL_ID:-unsloth/Qwen3.8-27B-NVFP4}
       - --host
-      - 0.0.0.0
+      - ${BIND_HOST:-0.0.0.0}
       - --port
-      - "8000"
+      - ${CONTAINER_PORT:-8000}
       - --tensor-parallel-size
       - "1"
       - --gpu-memory-utilization
-      - "0.45"
+      - ${GPU_MEM_UTIL:-0.45}
       - --max-model-len
-      - "262144"
+      - ${MAX_MODEL_LEN:-262144}
       - --max-num-seqs
-      - "4"
+      - ${MAX_NUM_SEQS:-4}
       - --max-num-batched-tokens
-      - "8192"
+      - ${MAX_NUM_BATCHED_TOKENS:-8192}
       - --trust-remote-code
       - --reasoning-parser
       - qwen3
@@ -29,19 +29,27 @@ services:
       - --distributed-executor-backend
       - mp
       - --speculative-config
-      - '{"method":"mtp","num_speculative_tokens":5}'
+      - '{"method":"mtp","num_speculative_tokens":${SPEC_TOKENS:-5}}'
     environment:
-      - HF_HOME=/root/.cache/huggingface
+      - HF_HOME=${HF_CACHE_CONTAINER_DIR:-/root/.cache/huggingface}
     volumes:
-      - ~/.cache/huggingface:/root/.cache/huggingface
+      - ${HF_CACHE_HOST_DIR:-~/.cache/huggingface}:${HF_CACHE_CONTAINER_DIR:-/root/.cache/huggingface}
     ports:
-      - "8000:8000"
-    shm_size: "2g"
-    restart: unless-stopped
+      - "${HOST_PORT:-8000}:${CONTAINER_PORT:-8000}"
+    # TP=1 — no ipc: host needed; 2g shm suffices (SGLang/legacy stacks use
+    # ipc: host for their multi-process runtimes).
+    shm_size: "${SHM_SIZE:-2g}"
+    restart: "${RESTART_POLICY:-unless-stopped}"
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request;urllib.request.urlopen('http://127.0.0.1:${CONTAINER_PORT:-8000}/health', timeout=5)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 300s
     deploy:
       resources:
         reservations:
           devices:
-            - driver: nvidia
-              count: all
+            - driver: ${GPU_DRIVER:-nvidia}
+              count: ${GPU_COUNT:-all}
               capabilities: [gpu]

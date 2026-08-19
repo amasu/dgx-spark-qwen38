@@ -1,0 +1,40 @@
+{
+ "battery_version": 1,
+ "endpoint": "http://aitopatom-e38f.local:8000",
+ "model_id": "unsloth/Qwen3.8-27B-NVFP4",
+ "method": "two-call delta, temperature 0, max_tokens 80/680",
+ "results": [
+  {
+   "probe": "math (EN, eval-style)",
+   "tok_s": 34.2
+  },
+  {
+   "probe": "code (EN)",
+   "tok_s": 22.8
+  },
+  {
+   "probe": "code (DE)",
+   "tok_s": 21.1
+  },
+  {
+   "probe": "technical explain (FR)",
+   "tok_s": 17.0
+  },
+  {
+   "probe": "reasoning (FR)",
+   "tok_s": 29.3
+  },
+  {
+   "probe": "free prose (EN)",
+   "tok_s": 16.0
+  },
+  {
+   "probe": "free prose (FR)",
+   "tok_s": 15.8
+  },
+  {
+   "probe": "free prose (DE)",
+   "tok_s": 14.8
+  }
+ ]
+}

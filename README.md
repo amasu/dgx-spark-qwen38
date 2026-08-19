@@ -14,6 +14,9 @@ Deploy the current production stack (vLLM + NVFP4 + MTP) on a fresh DGX Spark:
 git clone https://github.com/amasu/dgx-spark-qwen38
 cd dgx-spark-qwen38
 
+# Optional: host-specific settings (ports, model, cache path, memory — see example.env)
+cp example.env .env
+
 # 1. Start the current production stack (vLLM + NVFP4 + MTP)
 docker compose -f docker-compose.vllm.yml up -d
 
@@ -49,11 +52,39 @@ changing config. `restart: unless-stopped` hides engine crashes behind restarts.
 | `docker-compose.vllm.yml` | vLLM + NVFP4 + embedded MTP (`vllm-node-b12x:latest`) | **current production** |
 | `docker-compose.sglang.yml` | SGLang + NVFP4 + DSPARK draft (`lmsysorg/sglang:qwen38-27b`) | rollback |
 | `docker-compose.yml` | vLLM + FP8 + DSPARK draft (`vllm/vllm-openai:v0.27.1`) | legacy |
-| `Dockerfile` | Multi-stage DeepGemm build experiment (arm64) | experimental |
+| `Dockerfile` | Multi-stage DeepGemm build experiment (arm64) | experimental — see [Building the image](#building-the-experimental-image) |
 
 Only one stack runs at a time; switch with `docker compose -f <file> up -d` after
 `down` on the active one. All stacks expose the OpenAI-compatible endpoint on
 port 8000.
+
+## Building the experimental image
+
+The `Dockerfile` is **only needed for the legacy FP8 stack** (`docker-compose.yml`).
+It bakes a DeepGEMM wheel into `vllm/vllm-openai:v0.27.1` and patches
+`should_auto_disable_deep_gemm` so the kernels can be forced via
+`VLLM_USE_DEEP_GEMM=1`. The production NVFP4+MTP stack does **not** use it — this
+is a rollback/learning artifact, not a dependency of the current setup.
+
+```bash
+# Build ON the DGX Spark (ARM64) — the wheel is compiled ARM64 to match the
+# Ubuntu arm64 base image; from any other machine add --platform linux/arm64.
+docker build -t vllm-openai:deepgemm .
+
+# Then run the legacy stack (the only one that references this image):
+docker compose -f docker-compose.yml up -d
+```
+
+Notes:
+- `docker-compose.yml` has no `build:` directive — `docker compose up` alone
+  pulls the image, it does not build it. Run `docker build` first, or
+  `docker compose -f docker-compose.yml up -d --build` to build + start in one.
+- Build takes several minutes (torch 2.13 cu130 wheel + DeepGEMM v2.1.1.post3
+  compile); expect ~10 GB of build layers.
+- Verify DeepGemm is active at runtime:
+  `docker compose -f docker-compose.yml logs | grep -i deepgemm` — if the log
+  instead shows the "auto-disables DeepGemm" note, `VLLM_USE_DEEP_GEMM=1`
+  (already set in the compose file) isn't reaching the patched check.
 
 ## Current production stack
 
@@ -93,6 +124,27 @@ docker ps   # check for crash-loop (restart: unless-stopped + engine crash = sil
 
 Per-request thinking toggle: `chat_template_kwargs: {"enable_thinking": false}`.
 
+## Benchmarking
+
+`bench-matrix.sh` runs a fixed workload battery (8 prompts × 3 languages)
+against **any** OpenAI-compatible endpoint and reports tok/s. Decode is
+measured net of prefill via a two-call delta (80 vs 680 max_tokens, same
+prompt), so results stay comparable across engines, boxes and months —
+commit the JSON as history.
+
+```bash
+# Defaults match the production stack (port 8000, model unsloth/…-NVFP4):
+./bench-matrix.sh
+# Custom endpoint / model / no auth:
+BASE_URL=http://127.0.0.1:9000 MODEL=my-model API_KEY= ./bench-matrix.sh
+# API key from file: $HOME/.config/qwen38/api-key (or set API_KEY_FILE=)
+```
+
+Output: human table + `bench-matrix-<label>.json`; `<label>` derives from
+`BASE_URL` (override with `LABEL=`). Sample result:
+[`bench-matrix-qe38f.json`](bench-matrix-qe38f.json) — aitopatom box, prod
+stack, ~15–34 tok/s (~21 avg) depending on prompt.
+
 ## Credits
 
 This repo's configs are based on community work in the NVIDIA DGX Spark /
@@ -127,3 +179,7 @@ NVIDIA Developer forums — DGX Spark / GB10 category:
 - Qwen3.8-27B-NVFP4 on a single DGX Spark (vLLM+MTP): thread [#380244](https://forums.developer.nvidia.com/t/qwen3-8-27b-nvfp4-on-a-single-dgx-spark-up-to-1m-context-vllm-mtp-measurements/380244)
 - Dual-Spark TP2 measurements: thread [#380350](https://forums.developer.nvidia.com/t/qwen3-8-27b-on-dual-sparks/380350)
 - SGLang 34–38 tok/s setup: thread [#380257](https://forums.developer.nvidia.com/t/qwen3-8-27b-at-34-38-tok-s-on-dgx-spark-open-source-one-command-setup-sglang-nvfp4-dspark/380257)
+
+## License
+
+MIT — see [LICENSE](LICENSE).

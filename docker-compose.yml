@@ -4,17 +4,17 @@ services:
     container_name: qwen38
     command:
       - --model
-      - Qwen/Qwen3.8-27B-FP8
+      - ${MODEL_ID:-Qwen/Qwen3.8-27B-FP8}
       - --host
-      - 0.0.0.0
+      - ${BIND_HOST:-0.0.0.0}
       - --port
-      - "8000"
+      - ${CONTAINER_PORT:-8000}
       - --served-model-name
       - qwen3.8-27b
       - --gpu-memory-utilization
-      - "0.85"
+      - ${GPU_MEM_UTIL:-0.85}
       - --max-model-len
-      - "32768"
+      - ${MAX_MODEL_LEN:-32768}
       - --dtype
       - auto
       - --trust-remote-code
@@ -24,23 +24,29 @@ services:
       - --spec-method
       - dspark
       - --spec-model
-      - Doopeworld/Qwen3.8-27B-DSpark-vLLM
+      - ${DRAFT_MODEL_ID:-Doopeworld/Qwen3.8-27B-DSpark-vLLM}
       - --spec-tokens
-      - "7"
+      - ${SPEC_TOKENS:-7}
     environment:
-      - HF_HOME=/root/.cache/huggingface
+      - HF_HOME=${HF_CACHE_CONTAINER_DIR:-/root/.cache/huggingface}
       - VLLM_USE_DEEP_GEMM=1
     volumes:
-      - ~/.cache/huggingface:/root/.cache/huggingface
+      - ${HF_CACHE_HOST_DIR:-~/.cache/huggingface}:${HF_CACHE_CONTAINER_DIR:-/root/.cache/huggingface}
     ports:
-      - "8000:8000"
+      - "${HOST_PORT:-8000}:${CONTAINER_PORT:-8000}"
     ipc: host
-    shm_size: "4g"
-    restart: unless-stopped
+    shm_size: "${SHM_SIZE:-4g}"
+    restart: "${RESTART_POLICY:-unless-stopped}"
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request;urllib.request.urlopen('http://127.0.0.1:${CONTAINER_PORT:-8000}/health', timeout=5)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 300s
     deploy:
       resources:
         reservations:
           devices:
-            - driver: nvidia
-              count: all
+            - driver: ${GPU_DRIVER:-nvidia}
+              count: ${GPU_COUNT:-all}
               capabilities: [gpu]

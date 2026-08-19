@@ -1,0 +1,6 @@
+# Local per-host settings — never commit. Ship example.env instead.
+.env
+.env.*
+
+# macOS junk
+.DS_Store
