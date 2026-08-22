@@ -1,0 +1,52 @@
+services:
+  qwen38:
+    image: vllm-openai:deepgemm
+    container_name: qwen38
+    command:
+      - --model
+      - ${MODEL_ID:-Qwen/Qwen3.8-27B-FP8}
+      - --host
+      - ${BIND_HOST:-0.0.0.0}
+      - --port
+      - ${CONTAINER_PORT:-8000}
+      - --served-model-name
+      - qwen3.8-27b
+      - --gpu-memory-utilization
+      - ${GPU_MEM_UTIL:-0.85}
+      - --max-model-len
+      - ${MAX_MODEL_LEN:-32768}
+      - --dtype
+      - auto
+      - --trust-remote-code
+      - --enable-prefix-caching
+      - --reasoning-parser
+      - qwen3
+      - --spec-method
+      - dspark
+      - --spec-model
+      - ${DRAFT_MODEL_ID:-Doopeworld/Qwen3.8-27B-DSpark-vLLM}
+      - --spec-tokens
+      - ${SPEC_TOKENS:-7}
+    environment:
+      - HF_HOME=${HF_CACHE_CONTAINER_DIR:-/root/.cache/huggingface}
+      - VLLM_USE_DEEP_GEMM=1
+    volumes:
+      - ${HF_CACHE_HOST_DIR:-~/.cache/huggingface}:${HF_CACHE_CONTAINER_DIR:-/root/.cache/huggingface}
+    ports:
+      - "${HOST_PORT:-8000}:${CONTAINER_PORT:-8000}"
+    ipc: host
+    shm_size: "${SHM_SIZE:-4g}"
+    restart: "${RESTART_POLICY:-unless-stopped}"
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request;urllib.request.urlopen('http://127.0.0.1:${CONTAINER_PORT:-8000}/health', timeout=5)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 300s
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: ${GPU_DRIVER:-nvidia}
+              count: ${GPU_COUNT:-all}
+              capabilities: [gpu]

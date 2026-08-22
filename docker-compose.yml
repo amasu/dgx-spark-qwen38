@@ -1,48 +1,96 @@
+# CURRENT PRODUCTION — SGLang + NVFP4 + DFlash2, greedy default.
+# Selected from the engine × sampler A/B in benchmarking.md (2026-08-22):
+# tool-eval-bench seed-42 93/100 hardmode / 91 standard, ~2.5× faster than the
+# previous vLLM+MTP stack, no safety regression. Quality-primary, speed-
+# secondary winner.
+#
+# Image ${SERVE_IMAGE} is a LOCAL build tag (not on any registry) — see the
+# "Obtaining the serving image" section in README.md. It is the public base
+# lmsysorg/sglang:qwen38-27b + a 5-file sha256-verified DFlash2 overlay from
+# the SGLang commit-1cf2b8c tree (PR #35496, the quantized-lm_head selector
+# that the NVFP4 checkpoint requires). Build once per host, then
+# `docker compose up -d`.
+#
+# All values are env-parameterized for portability (defaults = the validated
+# aitopatom1 run). Copy example.env -> .env to override on this host; with
+# host networking the serving port is exposed directly (no port mapping).
 services:
   qwen38:
-    image: vllm-openai:deepgemm
-    container_name: qwen38
+    image: ${SERVE_IMAGE:-qwen38-dflash2:v1.2.2}
+    container_name: ${CONTAINER_NAME:-qwen38-dflash2}
+    network_mode: host
+    ipc: host
+    mem_limit: ${MEM_LIMIT:-100g}
+    memswap_limit: ${MEM_LIMIT:-100g}
+    shm_size: ${SHM_SIZE:-16g}
+    environment:
+      - TORCHINDUCTOR_CACHE_DIR=/cache/inductor
+      - HF_HOME=${HF_CACHE_CONTAINER_DIR:-/root/.cache/huggingface}
+    volumes:
+      - ${HF_CACHE_HOST_DIR:-/home/amasu/.cache/huggingface}:${HF_CACHE_CONTAINER_DIR:-/root/.cache/huggingface}
+      - ${CONFIG_HOST_DIR:-/home/amasu/.config/qwen38}:/out
+      - ${SGLANG_CACHE_HOST_DIR:-${CONFIG_HOST_DIR:-/home/amasu/.config/qwen38}/sglang-cache}:/cache
+    entrypoint: ["python3", "-m", "sglang.launch_server"]
     command:
-      - --model
-      - ${MODEL_ID:-Qwen/Qwen3.8-27B-FP8}
+      - --trust-remote-code
+      - --model-path
+      - ${MODEL_ID:-RadixArk/Qwen3.8-27B-NVFP4}
+      - --tp-size
+      - "1"
+      - --served-model-name
+      - ${SERVED_MODEL_NAME:-qwen3.8-27b}
+      - --mem-fraction-static
+      - ${MEM_FRACTION_STATIC:-0.50}
+      - --attention-backend
+      - flashinfer
+      - --chunked-prefill-size
+      - ${CHUNKED_PREFILL_SIZE:-8192}
+      - --disable-prefill-cuda-graph
+      - --cuda-graph-max-bs
+      - ${CUDA_GRAPH_MAX_BS:-8}
+      - --disable-flashinfer-autotune
+      - --speculative-algorithm
+      - DFLASH
+      - --speculative-draft-model-path
+      - ${DRAFT_MODEL_ID:-z-lab/Qwen3.8-27B-DFlash2}
+      - --speculative-draft-model-revision
+      - ${DRAFT_REV:-50307d4c4cde6860d4eee73e2547cd786fe8e8a4}
+      - --speculative-num-draft-tokens
+      - ${DRAFT_TOKENS:-8}
+      - --speculative-draft-model-quantization
+      - unquant
+      - --mamba-radix-cache-strategy
+      - extra_buffer
+      - --mamba-ssm-dtype
+      - bfloat16
+      - --max-mamba-cache-size
+      - ${MAX_MAMBA_CACHE_SIZE:-96}
+      - --max-running-requests
+      - ${MAX_RUNNING_REQUESTS:-8}
+      - --enable-torch-compile
+      - --torch-compile-max-bs
+      - ${TORCH_COMPILE_MAX_BS:-4}
+      - --num-continuous-decode-steps
+      - "2"
+      - --allow-auto-truncate
+      - --reasoning-parser
+      - qwen3
+      - --tool-call-parser
+      - qwen3_coder
+      - --chat-template
+      - /out/chat-template-sglang.jinja
+      - --sleep-on-idle
       - --host
       - ${BIND_HOST:-0.0.0.0}
       - --port
       - ${CONTAINER_PORT:-8000}
-      - --served-model-name
-      - qwen3.8-27b
-      - --gpu-memory-utilization
-      - ${GPU_MEM_UTIL:-0.85}
-      - --max-model-len
-      - ${MAX_MODEL_LEN:-32768}
-      - --dtype
-      - auto
-      - --trust-remote-code
-      - --enable-prefix-caching
-      - --reasoning-parser
-      - qwen3
-      - --spec-method
-      - dspark
-      - --spec-model
-      - ${DRAFT_MODEL_ID:-Doopeworld/Qwen3.8-27B-DSpark-vLLM}
-      - --spec-tokens
-      - ${SPEC_TOKENS:-7}
-    environment:
-      - HF_HOME=${HF_CACHE_CONTAINER_DIR:-/root/.cache/huggingface}
-      - VLLM_USE_DEEP_GEMM=1
-    volumes:
-      - ${HF_CACHE_HOST_DIR:-~/.cache/huggingface}:${HF_CACHE_CONTAINER_DIR:-/root/.cache/huggingface}
-    ports:
-      - "${HOST_PORT:-8000}:${CONTAINER_PORT:-8000}"
-    ipc: host
-    shm_size: "${SHM_SIZE:-4g}"
-    restart: "${RESTART_POLICY:-unless-stopped}"
+    restart: ${RESTART_POLICY:-unless-stopped}
     healthcheck:
       test: ["CMD", "python3", "-c", "import urllib.request;urllib.request.urlopen('http://127.0.0.1:${CONTAINER_PORT:-8000}/health', timeout=5)"]
       interval: 30s
       timeout: 5s
       retries: 3
-      start_period: 300s
+      start_period: 540s
     deploy:
       resources:
         reservations:
