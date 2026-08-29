@@ -8,6 +8,45 @@ user `amasu`, LAN IP `192.168.50.201`).
 quality-primary / speed-secondary winner of an engine × sampler A/B — see
 [`benchmarking.md`](benchmarking.md) for the full evidence.
 
+## Changelog
+
+### 2026-08-29 — config A/B day: cps 2048 adopted, BF16-LMHead rejected
+
+Two single-variable A/Bs against the production stack (serial, identical bench
+protocol — details and full tables in [`benchmarking.md`](benchmarking.md) §6):
+
+- **`CHUNKED_PREFILL_SIZE` 8192 → 2048 — adopted.** Decode within run-to-run
+  noise (prose 23.3 vs 24.9, code 40.0 vs 39.1, c4 25.6 vs 26.7, c16 26.0 vs
+  25.2 tok/s; probes 5/5 both). Kept for the long-context prefill win (forum
+  thread 381102: TTFT 415 s vs 441 s at 512K ctx). Shipped via
+  `CHUNKED_PREFILL_SIZE=2048` in the host `.env` (compose default unchanged).
+- **`RadixArk/Qwen3.8-27B-NVFP4-BF16-LMHead` — rejected.** Decode regressed
+  ~20–25% across the board (prose 19.0, code 30.4, c4 21.4, c16 22.3 tok/s)
+  with no measurable quality gain (probes 5/5, outputs indistinguishable).
+  Checkpoint stays cached for future re-tests (swap via `MODEL_ID`).
+- Docs: `benchmarking.md` §6 + `example.env` updated (`b0ea9b7`).
+
+### 2026-08-22 — DFlash2 becomes production
+
+- Switched from vLLM+NVFP4+MTP to **SGLang + NVFP4 + DFlash2** after the
+  engine × sampler A/B: ~2–2.5× faster at tied or better tool-calling quality
+  (91 standard / 93 hard-mode), no safety regression.
+- `docker-compose.yml` = DFlash2 production; vLLM+MTP and SGLang+DSpark kept
+  as instant rollbacks. Added benchmarking evidence, bench-matrix JSONs.
+
+### 2026-08-19 — hardening pass
+
+- Env templating for all composes (`${VAR:-default}` + `example.env` template),
+  `.gitignore`, MIT license, healthchecks.
+- Documented image provenance for `eugr/spark-vllm-b12x` (digest pin + one-time
+  pull step) and B12X source-build instructions (`eugr/spark-vllm-docker`).
+
+### 2026-08-18 — initial release
+
+- Compose stacks for vLLM+NVFP4+MTP (then-production) and SGLang+FP8 rollback;
+  quick start, forum credits.
+
+
 ## Quick start
 
 Deploy the current production stack (SGLang + NVFP4 + DFlash2) on a fresh DGX Spark:
