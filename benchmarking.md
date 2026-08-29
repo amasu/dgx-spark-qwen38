@@ -105,6 +105,43 @@ Deploy **SGLang + NVFP4 + DFlash2, greedy default**, on port 8000, model id
 available per-request for clients that want deeper planning — but it trades
 safety (TC-58) and 2× latency for a marginal, noise-level quality gain.
 
+## 6. Config A/B (2026-08-29): chunked-prefill 2048 adopted, BF16-LMHead rejected
+
+Two single-variable A/Bs on the production SGLang+NVFP4+DFlash2 stack, identical
+`bench-endpoint.py` protocol (1024-tok prose/code single-stream, c4/c16 aggregate,
+5 accuracy probes), serial — one model on the box at a time.
+
+### 6.1 `CHUNKED_PREFILL_SIZE` 8192 → 2048 — **ADOPTED**
+
+| Metric | cps=8192 | cps=2048 | Δ |
+|---|---|---|---|
+| Prose (1024 tok) | 24.9 tok/s | 23.3 tok/s | −6% |
+| Code (1024 tok) | 39.1 tok/s | 40.0 tok/s | +2% |
+| 4 concurrent agg | 26.7 tok/s | 25.6 tok/s | −4% |
+| 16 concurrent agg | 25.2 tok/s | 26.0 tok/s | +3% |
+| Accuracy probes | 5/5 | 5/5 | = |
+
+Decode deltas are within run-to-run noise (see §4). Adopted for the long-context
+prefill win reported in NVIDIA forum thread 381102 (TTFT 415 s vs 441 s at 512K
+ctx, ~180 vs ~170 TFLOPS at chunk 2048 vs 8192). Shipped via
+`CHUNKED_PREFILL_SIZE=2048` in the host `.env`.
+
+### 6.2 `RadixArk/Qwen3.8-27B-NVFP4-BF16-LMHead` — **REJECTED**
+
+| Metric | NVFP4 (prod) | BF16-LMHead | Δ |
+|---|---|---|---|
+| Prose (1024 tok) | 23.3–24.9 tok/s | 19.0 tok/s | −20% |
+| Code (1024 tok) | 39–40 tok/s | 30.4 tok/s | −24% |
+| 4 concurrent agg | 25.6–26.7 | 21.4 | −18% |
+| 16 concurrent agg | 25.2–26.0 | 22.3 | −13% |
+| Accuracy probes | 5/5 | 5/5 | = |
+
+The BF16 lm_head adds real lm-head GEMM cost on the bandwidth-walled GB10 decode
+path; the advertised quality bump did not materialize (clean reasoning/edge-case
+outputs, but indistinguishable from NVFP4 at probe level; one 1500-token
+thinking-only burn on a code prompt). Checkpoint stays cached for re-tests
+(swap via `MODEL_ID` env var).
+
 ## Reproduce
 
 ```bash
