@@ -12,7 +12,7 @@
 # `docker compose up -d`.
 #
 # All values are env-parameterized for portability (defaults = the validated
-# aitopatom1 run). Copy example.env -> .env to override on this host; with
+# reference run). Copy example.env -> .env to override on this host; with
 # host networking the serving port is exposed directly (no port mapping).
 services:
   qwen38:
@@ -27,9 +27,9 @@ services:
       - TORCHINDUCTOR_CACHE_DIR=/cache/inductor
       - HF_HOME=${HF_CACHE_CONTAINER_DIR:-/root/.cache/huggingface}
     volumes:
-      - ${HF_CACHE_HOST_DIR:-/home/amasu/.cache/huggingface}:${HF_CACHE_CONTAINER_DIR:-/root/.cache/huggingface}
-      - ${CONFIG_HOST_DIR:-/home/amasu/.config/qwen38}:/out
-      - ${SGLANG_CACHE_HOST_DIR:-${CONFIG_HOST_DIR:-/home/amasu/.config/qwen38}/sglang-cache}:/cache
+      - ${HF_CACHE_HOST_DIR:-~/.cache/huggingface}:${HF_CACHE_CONTAINER_DIR:-/root/.cache/huggingface}
+      - ${CONFIG_HOST_DIR:-~/.config/qwen38}:/out
+      - ${SGLANG_CACHE_HOST_DIR:-${CONFIG_HOST_DIR:-~/.config/qwen38}/sglang-cache}:/cache
     entrypoint: ["python3", "-m", "sglang.launch_server"]
     command:
       - --trust-remote-code

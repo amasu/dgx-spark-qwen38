@@ -1,8 +1,10 @@
 # DGX Spark — Qwen3.8-27B serving (docker compose)
 
 Compose configs for serving **Qwen3.8-27B** on an NVIDIA DGX Spark (GB10) unit.
-Developed and validated on `aitopatom1` (host alias via NVIDIA Sync ssh_config,
-user `amasu`, LAN IP `192.168.50.201`).
+Developed and validated on a reference DGX Spark (see
+[`benchmarking.md`](benchmarking.md) for the benchmark protocol); no
+host-specific configuration is required — paths, ports and model ids are
+env-parameterized (see `example.env`).
 
 **Current setup: SGLang + NVFP4 + DFlash2, greedy default.** Selected as the
 quality-primary / speed-secondary winner of an engine × sampler A/B — see
@@ -70,7 +72,6 @@ cd dgx-spark-qwen38
 #                                # qwen38-dflash2:v1.2.2, writes the patched
 #                                # chat template + API key. No systemd.
 #    cd <back to this repo>
-#    On aitopatom1 the image already exists (built 2026-08-22).
 
 # 1. Start the current production stack
 docker compose up -d

@@ -1,4 +1,4 @@
-# Benchmarking — Qwen3.8-27B on DGX Spark (aitopatom1)
+# Benchmarking — Qwen3.8-27B on DGX Spark (single GB10 reference box)
 
 Results from the empirical engine × sampler comparison, the hard-mode run, and
 the DeepSWE confirmation attempt. All tool-eval-bench numbers below are

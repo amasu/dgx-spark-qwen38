@@ -6,7 +6,7 @@
 # two-call delta (80 vs 680 max_tokens, same prompt), which cancels TTFT and
 # needs no streaming support.
 #
-#   ./bench-matrix.sh                                   # this repo's prod stack (vLLM+MTP)
+#   ./bench-matrix.sh                                   # this repo's prod stack (DFlash2)
 #   BASE_URL=http://127.0.0.1:9000 MODEL=my-model ./bench-matrix.sh  # other engines
 #   API_KEY= ./bench-matrix.sh                          # no auth (default: key file)
 #
@@ -14,7 +14,7 @@
 set -euo pipefail
 PORT="${PORT:-8000}"
 BASE_URL="${BASE_URL:-http://127.0.0.1:$PORT}"
-MODEL="${MODEL:-unsloth/Qwen3.8-27B-NVFP4}"
+MODEL="${MODEL:-qwen3.8-27b}"
 KEY_FILE="${API_KEY_FILE:-$HOME/.config/qwen38/api-key}"
 API_KEY="${API_KEY-$( [ -s "$KEY_FILE" ] && cat "$KEY_FILE" || true )}"
 LABEL="${LABEL:-$(echo "$BASE_URL" | tr -dc 'a-zA-Z0-9' | tail -c 12)}"
