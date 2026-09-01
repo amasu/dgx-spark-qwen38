@@ -1,0 +1,40 @@
+{
+ "battery_version": 1,
+ "endpoint": "http://127.0.0.1:8000",
+ "model_id": "qwen3.8-27b",
+ "method": "two-call delta, temperature 0, max_tokens 80/680",
+ "results": [
+  {
+   "probe": "math (EN, eval-style)",
+   "tok_s": 45.7
+  },
+  {
+   "probe": "code (EN)",
+   "tok_s": 37.6
+  },
+  {
+   "probe": "code (DE)",
+   "tok_s": 44.0
+  },
+  {
+   "probe": "technical explain (FR)",
+   "tok_s": 30.3
+  },
+  {
+   "probe": "reasoning (FR)",
+   "tok_s": 48.8
+  },
+  {
+   "probe": "free prose (EN)",
+   "tok_s": 22.0
+  },
+  {
+   "probe": "free prose (FR)",
+   "tok_s": 20.2
+  },
+  {
+   "probe": "free prose (DE)",
+   "tok_s": 17.3
+  }
+ ]
+}

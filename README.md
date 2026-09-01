@@ -12,6 +12,20 @@ quality-primary / speed-secondary winner of an engine × sampler A/B — see
 
 ## Changelog
 
+### 2026-09-01 — two follow-up A/Bs rejected; host-agnostic re-validation
+
+- **Repo re-validated on a clean clone**: full production redeploy from repo
+  code alone (host-agnostic compose), healthy in ~7 min, bench-matrix in band —
+  see `bench-matrix-repo-test-e38f.json`.
+- **froggeric v22.4 chat template — rejected**: quality 91/100 → 91/100
+  (126/138 pts identical), 6-up/6-down scenario flips = noise signature.
+- **`lmsysorg/sglang:dev-qwen38-27b-dflash2` (2026-08-20 build) — rejected**:
+  quality 91 → **88** (126 → 122 pts), scenario flips 5-down/1-up with
+  concentrated category damage (Code Patterns 6→4); marginal speed delta
+  (+3.2% mean) inside the noise band. Production stays on the validated
+  `qwen38-dflash2:v1.2.2` + original chat template.
+- Evidence: `benchmarking.md` §7 + `tool-eval-reports/2026-09-01--*.md`.
+
 ### 2026-08-29 — config A/B day: cps 2048 adopted, BF16-LMHead rejected
 
 Two single-variable A/Bs against the production stack (serial, identical bench

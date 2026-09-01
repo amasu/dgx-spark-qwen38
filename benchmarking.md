@@ -142,6 +142,65 @@ outputs, but indistinguishable from NVFP4 at probe level; one 1500-token
 thinking-only burn on a code prompt). Checkpoint stays cached for re-tests
 (swap via `MODEL_ID` env var).
 
+## 7. Follow-up A/Bs (2026-09-01): chat-template and engine build — both rejected
+
+Two serial single-variable A/Bs against the production stack on the same box,
+each gated on bench-matrix (speed) **and** tool-eval-bench seed 42 (quality,
+69 scenarios). Deployment for both runs was from a clean `git clone` of this
+repo (host-agnostic compose, cps=2048 via `.env`).
+
+Baseline cell (re-validated that morning from the clone): quality **91/100**
+(126/138 pts), 58 pass / 9 partial / 2 fail, bench-matrix 8/8 reliable.
+
+### 7.1 froggeric/Qwen-Fixed-Chat-Templates v22.4 — **REJECTED (no gain)**
+
+Community template claiming parallel-tool-call token parity, multi-system merge
+and KV-cache-preserving history (upstream claims: +7.4 answer score, −59%
+thinking tokens on Claw-Eval). Render-parity was verified first: the tool-call
+wire format (`<tool_call>`/`<function=`/`<parameter=`) is byte-identical for tool-call
+history, so the `qwen3_coder` parser was not at risk. Swapped as
+`--chat-template` file; stack restarted (down → up).
+
+| Metric | Prod template | v22.4 | Δ |
+|---|---|---|---|
+| Quality | 91/100 (126 pts) | 91/100 (126 pts) | **= exactly** |
+| pass/partial/fail | 58 / 9 / 2 | 58 / 10 / 1 | noise |
+| Per-scenario flips | — | 6 up, 6 down | noise signature |
+| bench-matrix | — | mixed-sign deltas, mean \|Δ\| 14% | variance, not template |
+
+The upstream quality claim did not transfer: bidirectional scenario flips with
+the points total identical to the digit — the §4 variance signature, not signal.
+Weakest category unchanged (Autonomous Planning). Full report:
+`tool-eval-reports/2026-09-01--v224-template.md`; speed JSON:
+`bench-matrix-repo-test-e38f.json` (prod) vs the run in the report history.
+
+### 7.2 `lmsysorg/sglang:dev-qwen38-27b-dflash2` (2026-08-20 build) — **REJECTED (quality regression)**
+
+The official DFlash2 dev image (DFlash2 native in-tree, no overlay needed;
+HEAD `5f55db35e`). Pulled and booted with identical flags — boot was clean and
+the engine verified (served id, 262K ctx, DFlash w/ pinned draft revision).
+
+| Metric | v1.2.2 custom (base 2026-08-13/15) | dev-img 2026-08-20 | Δ |
+|---|---|---|---|
+| Quality | 91/100 (126 pts) | **88/100 (122 pts)** | **−4** |
+| pass/partial/fail | 58 / 9 / 2 | 55 / 12 / 2 | −3 pass |
+| Per-scenario flips | — | **5 down, 1 up** | regression signature |
+| Category drops | — | Code Patterns 6→4, Context & State 17→15, Autonomous Planning 4→3 | concentrated |
+| bench-matrix | — | mean +3.2% (7/8 probes ≥ baseline) | noise band |
+
+The flip asymmetry vs §7.1 is the decisive evidence: pure noise produced 6-up/6-down
+on the same engine; the engine swap produced 5-down/1-up with concentrated category
+damage — a real behavioral delta in the newer build (kernel/quant changes plausibly
+touching tool-call formatting, per the Code Patterns drop). The marginal speed delta
+did not justify the accuracy cost (quality-primary / speed-secondary). Image stays
+cached locally for a future re-test when a build containing the trtllm-gen sm_121
+sparse-decode fix (#36649, merged 2026-08-27, not in any pullable tag as of
+2026-09-01) is published. Full report: `tool-eval-reports/2026-09-01--devimg-0820.md`.
+
+**Net:** production config unchanged — `qwen38-dflash2:v1.2.2` + original
+template. Day's finding: the §1–§6 production cell remains the measured ceiling
+on this box; two "obvious upgrade" candidates both failed their quality gate.
+
 ## Reproduce
 
 ```bash
