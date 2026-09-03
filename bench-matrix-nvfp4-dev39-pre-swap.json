@@ -1,0 +1,40 @@
+{
+ "battery_version": 1,
+ "endpoint": "http://aitopatom-e38f.local:8000",
+ "model_id": "qwen3.8-27b",
+ "method": "two-call delta, temperature 0, max_tokens 80/680",
+ "results": [
+  {
+   "probe": "math (EN, eval-style)",
+   "tok_s": 54.1
+  },
+  {
+   "probe": "code (EN)",
+   "tok_s": 33.6
+  },
+  {
+   "probe": "code (DE)",
+   "tok_s": 46.0
+  },
+  {
+   "probe": "technical explain (FR)",
+   "tok_s": 30.3
+  },
+  {
+   "probe": "reasoning (FR)",
+   "tok_s": 48.4
+  },
+  {
+   "probe": "free prose (EN)",
+   "tok_s": 22.4
+  },
+  {
+   "probe": "free prose (FR)",
+   "tok_s": 19.9
+  },
+  {
+   "probe": "free prose (DE)",
+   "tok_s": 17.9
+  }
+ ]
+}

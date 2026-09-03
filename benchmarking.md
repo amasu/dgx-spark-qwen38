@@ -142,6 +142,46 @@ outputs, but indistinguishable from NVFP4 at probe level; one 1500-token
 thinking-only burn on a code prompt). Checkpoint stays cached for re-tests
 (swap via `MODEL_ID` env var).
 
+### 6.2.1 BF16-LMHead dev39 re-test (2026-09-03) — **rejection confirmed, version-matched**
+
+jomark's thread reported ~90–92/100 cells on BF16-LMHead that predate the current
+harness, so both cells were re-run version-matched: harness pinned to
+`2.6.1.dev39` both sides, same stack (`qwen38-dflash2:v1.2.2`), same flags,
+serial `MODEL_ID` swap checkpoint-only (local snapshot `009632fe`),
+healthy-revert verified after.
+
+Speed (bench-matrix v1, greedy, decode net of prefill — same-day NVFP4 baseline):
+
+| Probe | NVFP4 | BF16-LMHead | Δ |
+|---|---|---|---|
+| math (EN, eval-style) | 54.1 | 37.9 | **−30%** |
+| code (EN) | 33.6 | 29.5 | −12% |
+| code (DE) | 46.0 | 39.4 | −14% |
+| technical explain (FR) | 30.3 | 28.5 | −6% |
+| reasoning (FR) | 48.4 | 43.4 | −10% |
+| free prose (EN / FR / DE) | 22.4 / 19.9 / 17.9 | 19.4 / 18.2 / 15.3 | −14 / −9 / −15% |
+
+**8/8 probes slower, mean −13.7%, median −12.8%** — sign-consistent across all
+workloads, the real-effect signature (vs ±16% mixed-direction noise per §4).
+
+Quality (tool-eval-bench seed 42, 69 scenarios, both cells dev39):
+
+| Metric | NVFP4 | BF16-LMHead |
+|---|---|---|
+| Final score | 91/100 (125/138 pts) | 91/100 (126/138 pts) |
+| Median turn | 3.6 s | 4.3 s |
+| TC-43 / TC-58 | fail / pass | **pass** / pass |
+
+Only 4 scenario flips, 3 pts BF16-favored / 2 pts NVFP4-favored, spread across
+unrelated scenarios — the §4 noise signature, not concentrated category damage.
+TC-43's fail→pass flip matches its known temp-0 run-to-run wobble (§4, forum
+caveat). Version-matched conclusion: **the claimed quality increase does not
+reproduce (91 = 91); the decode cost does.** Raw evidence:
+`tool-eval-reports/2026-09-03--qwen38-dev39-greedy.md` and
+`tool-eval-reports/2026-09-03--bf16lmhead-dev39.md` (quality),
+`bench-matrix-nvfp4-dev39-pre-swap.json` + `bench-matrix-bf16lmhead-dev39.json`
+(speed).
+
 ## 7. Follow-up A/Bs (2026-09-01): chat-template and engine build — both rejected
 
 Two serial single-variable A/Bs against the production stack on the same box,
@@ -201,6 +241,39 @@ sparse-decode fix (#36649, merged 2026-08-27, not in any pullable tag as of
 template. Day's finding: the §1–§6 production cell remains the measured ceiling
 on this box; two "obvious upgrade" candidates both failed their quality gate.
 
+## 8. Sampler re-validation + BF16-LMHead version-matched re-test (2026-09-03)
+
+Two questions came up on the forum thread after the §1–§7 rounds: (a) does the
+greedy-vs-thinking sampler result survive the current tool-eval-bench build, and
+(b) does the BF16-LMHead quality impression hold once both cells run on the same
+harness version. Both re-tested serial on the production stack (§5), harness
+pinned per cell (`2.6.1.dev32` first pass, `2.6.1.dev39` confirmation), seed 42,
+69 scenarios, thinking enabled in all cells (see §1 sampler row).
+
+### 8.1 Greedy vs thinking sampler — reproduced on dev32 and dev39
+
+| Cell | dev32 | dev39 |
+|---|---|---|
+| greedy (t=0) | 91/100 (125/138), 3.5 s | 91/100 (125/138), 3.6 s |
+| thinking (t=1.0, p=0.95, k=20) | 88/100 (121/138), 3.9 s | 89/100 (123/138), 4.0 s |
+
+Per-scenario, the same signature both versions: greedy ≥ thinking on net
+(dev39: 8 flips, 6 pts greedy-favored / 4 think-favored), **TC-58
+(fake-system-message injection) passes at t=0 and degrades under the thinking
+sampler both times**, and TC-43 (omitted-required-parameter) is the one
+scenario thinking consistently fixes — its known wobble (§4) shows up on the
+greedy side as the fail. Greedy remains the production sampler; the §1 verdict
+survives a harness-version change. Harness version itself moved the thinking
+cell only −1/+1 pt (88→89) and greedy not at all — so the §7-style version
+noise is bounded at ±1 here, far below the ±2–3 sampler gap.
+Raw reports: `tool-eval-reports/2026-09-03--qwen38-dev39-{greedy,think}.md`
+(dev39 pair; dev32 pair from the same day in the report history).
+
+### 8.2 see §6.2.1 — BF16-LMHead re-tested version-matched, rejection confirmed
+
+The §6.2.1 cells above are the dev39 confirmation; §8 exists to keep the
+sampler re-validation and the checkpoint re-test in one dated entry.
+
 ## Reproduce
 
 ```bash
@@ -220,4 +293,5 @@ BASE_URL=http://<host>.local:8000 MODEL=qwen3.8-27b ./bench-matrix.sh
 
 Full tool-eval reports: `~/tool-eval-runs/runs/2026/08/*.md`
 (`vllm-mtp-think`, `dflash2-greedy`, `dflash2-think`, `dflash2-greedy-hardmode`,
-plus the original `qwen38-seed42` vLLM-greedy baseline).
+plus the original `qwen38-seed42` vLLM-greedy baseline). Committed copies of
+the 2026-09-01 and 2026-09-03 cells live in `tool-eval-reports/`.
