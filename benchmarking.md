@@ -274,6 +274,44 @@ Raw reports: `tool-eval-reports/2026-09-03--qwen38-dev39-{greedy,think}.md`
 The §6.2.1 cells above are the dev39 confirmation; §8 exists to keep the
 sampler re-validation and the checkpoint re-test in one dated entry.
 
+## 9. SGLang v0.5.19 engine image (2026-09-13) — REJECTED
+
+Engine-only A/B: `lmsysorg/sglang:v0.5.19` (official arm64 tag, digest
+`d6e72886…`, first tagged release with DFlash2 mainline + PR #35496) vs prod
+`qwen38-dflash2:v1.2.2` (Aug-15 build + 5-file overlay). Single variable:
+`SERVE_IMAGE` env override on the same compose — identical flags, checkpoint
+`RadixArk/Qwen3.8-27B-NVFP4`, DFlash2 draft @`50307d4c`, cps 2048, template
+untouched. Harness: bench-matrix v1 (8 probes) + tool-eval-bench seed-42
+pinned `2.6.1.dev39` both sides (version-matched protocol). Serial rule
+respected; prod restored and verified after.
+
+- **Speed (bench-matrix, same-day paired):** 7/8 probes comparable, mean
+  |Δ| ~7% with mixed signs (code EN 46.9→43.7 −6.8%, code DE 35.3→40.0
+  +13.3%, tech FR 33.7→34.4, reasoning FR 54.7→50.7 −7.3%, prose
+  ~19–21→~19–23 both ways) — noise band, no speed win. Math probe: prod
+  unreliable-sample (null), variant 51.0. Boot ~13 min (inductor re-JIT); KV
+  pool larger on v0.5.19 (386,252 tok) at same mem-fraction 0.5.
+- **Quality (tool-eval seed-42, dev39): 88/100 (122/138 pts) vs 91/100
+  (125/138) baseline** — 44 pass / 6 partial / 1 fail (TC-51, known temp-0
+  wobble cell). Flip analysis: category damage 4-down / 1-up — Context &
+  State 16→15, Code Patterns 6→5, Autonomous Planning 5→3 (−2),
+  Creative Composition 6→5; only Safety & Boundaries 22→24 up. The 4:1
+  down-skew concentrated in agentic categories = REAL regression
+  (benchmarking.md §4 discriminator; same signature as the rejected 08-20
+  dev image). Not run-to-run noise (template A/B on 09-01 showed 1:1 flips
+  at unchanged totals for noise).
+- **Also verified while prepping:** PR #36649 (sm_121 QSA trtllm-gen sparse
+  decode) does NOT affect the 27B prod stack — QSA is a Flash-Next-lineage
+  sparse-attention path absent from v0.5.19 entirely and reverted on main
+  ("silently corrupts long-context decode on SM121/GB10"). The 27B runs
+  flashinfer + GDN. Earlier assumption corrected.
+- **Verdict: prod stays `qwen38-dflash2:v1.2.2`.** v0.5.19 gains: no speed
+  change, −3 quality, and no applicable fix for this stack (#36649 inapplicable).
+  Image kept in docker cache for a future re-test if a later build carries
+  a DFlash2-relevant fix. Raw evidence: `bench-matrix-v122-prod-0913.json`,
+  `bench-matrix-v0519-0913.json` (endpoints scrubbed to 127.0.0.1),
+  `tool-eval-reports/2026-09-13--sglang-v0519-dev39.md`.
+
 ## Reproduce
 
 ```bash
