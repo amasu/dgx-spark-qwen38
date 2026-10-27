@@ -312,6 +312,53 @@ respected; prod restored and verified after.
   `bench-matrix-v0519-0913.json` (endpoints scrubbed to 127.0.0.1),
   `tool-eval-reports/2026-09-13--sglang-v0519-dev39.md`.
 
+## 10. SGLang v0.5.22 engine image (2026-10-26/27) — REJECTED
+
+**Context found at swap time (flagged to Oussama, kept as-is on his instruction):** the
+live prod was NOT the RadixArk config — `.env` carried
+`MODEL_ID=DavidAU/Qwen3.8-27B-TURBO-Fable-Cold-Fusion-735-882-Heretic-Uncensored-NM-DAU`
++ `MEM_FRACTION_STATIC=0.70` (the stack §6.2/§"BF16 finetune" rejected 2026-09-21/22),
+container up 12 days. DFlash2 acceptance on it has collapsed (accept len 1.1–1.6 of 8,
+accept rate 3–5%) → bench-matrix 4.8–6.9 tok/s vs the 46.9/20 band recorded on the
+RadixArk config. Root cause is a checkpoint×drafter mismatch (z-lab drafter vs the
+finetune), not engine-side — v0.5.22 does not change it (acceptance identical on both
+arms). The A/B therefore measures the IMAGE effect on the DavidAU config, which
+Oussama chose deliberately ("use DavidAU as is").
+
+**Protocol**: pre-flight verified in the v0.5.22 tag tree that all 7 relevant PRs are
+ancestors of the tag (#41736, #41737, #41808, #43012, #43029, #37462 LiLiCorr, #42651);
+image `lmsysorg/sglang:v0.5.22` (e3a4f06001a2, 53.2 GB) pulled; serial swap via
+`SERVE_IMAGE=lmsysorg/sglang:v0.5.22` in `~/qwen38-compose/.env`. **One forced
+deviation from flags-untouched**: v0.5.22 renamed `--cuda-graph-max-bs` →
+`--cuda-graph-max-bs-decode` (ambiguous-option argparse error otherwise, crash-loop).
+Handled via a variant overlay `docker-compose.v0522.yml` (full command copy, single
+flag renamed; values identical: decode graphs full, max_bs 8, bs 1–8, prefill
+disabled). Server_args verified field-by-field against the baseline snapshot: every
+explicit flag identical; other deltas were version defaults (mm_feature_transport
+cuda_ipc→cpu, random_seed) or version-added fields. KV pool at the same mem-frac
+0.70: 120,438 → 137,449 tokens (+14%; #42651 backs the DFlash draft pool to the
+post-capture token count). Boot ~9 min healthy.
+
+**Results (same-day paired, dev71 harness `2.6.1.dev71+gf4477c7ef` both arms, seed 42,
+69 scenarios, thinking enabled):**
+- Speed: bench-matrix baseline 4.8–6.9 vs variant 4.8–5.6 tok/s — noise band, no win.
+- Quality: baseline 91/100 (126/138) vs variant **89/100 (123/138)**. Flips **0-up /
+  2-down** (TC-33 Hallucination Resistance pass→fail, TC-50 partial→fail) — fully
+  skewed = real per the standing rule; category damage concentrated: Safety &
+  Boundaries −2 (81%→73%), Context & State −1. Third consecutive engine-image A/B
+  with this exact regression signature (Aug-20, Sep-13, now v0.5.22).
+- Responsiveness: 18.5 s → 21.7 s median turn (both crippled by the collapsed drafter).
+- Note: TC-59 (Authority Escalation, CRITICAL) failed on BOTH arms — that is the
+  DavidAU checkpoint, independent of engine.
+
+**Verdict: REJECTED.** Prod reverted to `qwen38-dflash2:v1.2.2` + original `.env`
+(backup kept as `.env.bak-20261026-v0522ab`), health 200 ~8.5 min after recreate,
+SMOKE OK, `/v1/models` correct. The v0.5.22 image stays in the e38f docker cache and
+`docker-compose.v0522.yml` stays in `~/qwen38-compose` for a future re-test on a
+healthy drafter pairing. Raw: `bench-matrix-{v122-prod,v0522-dau}-1026.json`
+(endpoints scrubbed to 127.0.0.1) + `tool-eval-reports/2026-10-26--dau-baseline-dev71.md`
+and `2026-10-27--sglang-v0522-dau-dev71.md`.
+
 ## Reproduce
 
 ```bash
