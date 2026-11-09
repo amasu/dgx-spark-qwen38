@@ -41,6 +41,10 @@ services:
       - ${SERVED_MODEL_NAME:-qwen3.8-27b}
       - --mem-fraction-static
       - ${MEM_FRACTION_STATIC:-0.50}
+      - --kv-cache-dtype
+      - ${KV_CACHE_DTYPE:-fp8_e4m3}
+      - --stream-interval
+      - ${STREAM_INTERVAL:-1}
       - --attention-backend
       - flashinfer
       - --chunked-prefill-size

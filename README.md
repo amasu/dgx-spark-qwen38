@@ -139,9 +139,15 @@ on port 8000.
 - Target: `RadixArk/Qwen3.8-27B-NVFP4`; draft: `z-lab/Qwen3.8-27B-DFlash2`
   (block size 8, lossless)
 - Served model id: `qwen3.8-27b`; context 262144 tokens
-- `--mem-fraction-static 0.50` (do **not** raise — SGLang under-counts GB10
-  unified-memory transients; >0.50 risks a host freeze), plus
-  `--allow-auto-truncate` (agentic/DeepSWE contexts grow to ~110K tokens)
+- `--kv-cache-dtype fp8_e4m3` + `--mem-fraction-static 0.70` (validated
+  2026-11-09: KV pool 990,064 tokens, ~3.8 full 262K contexts; 8×~12K-token
+  concurrent prefill stress clean, 31 GB free at idle; decode unchanged).
+  With bf16 KV (`KV_CACHE_DTYPE=auto`) revert to 0.50 — SGLang under-counts
+  GB10 unified-memory transients and >0.50 risks a host freeze (see
+  CHANGELOG.md), plus `--allow-auto-truncate` (agentic/DeepSWE contexts grow
+  to ~110K tokens)
+- `--stream-interval 1` (one token per SSE event; DFlash2 otherwise batches
+  2–4 accepted tokens per event, which shows up as lumpy streaming in agents)
 - OpenAPI/no-auth on port 8000 (drop-in parity with the previous stack)
 - Boot ~9 min with cached weights (torch.compile + graph capture); later boots
   faster, cached
